@@ -6,6 +6,3 @@ win64 :
 	-I./luajit/src/ \
 	-L./luajit/lib/ \
 	-lluajit
-
-jit :
-	gcc -g -Wall --shared -o snapshot.dll snapshot.c -I../luajit/src/ -L. -lluajit
