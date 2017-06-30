@@ -36,3 +36,10 @@ sysinfo.txt
 # Builds
 *.apk
 *.unitypackage
+
+#vscode
+.vscode/
+
+#visual studio
+*.VC.db
+luaSnapshot/luaSnapshot/tmp/
