@@ -71,25 +71,25 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <IntDir>$(ProjectDir)tmp\</IntDir>
     <OutDir>$(ProjectDir)bin\debug\</OutDir>
-    <IncludePath>$(ProjectDir)luajit\src;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)luajit\src;$(ProjectDir)include\;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)luajit\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <IntDir>$(ProjectDir)tmp\</IntDir>
     <OutDir>$(ProjectDir)bin\release</OutDir>
-    <IncludePath>$(ProjectDir)luajit\src;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)luajit\src;$(ProjectDir)include\;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)luajit\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(ProjectDir)bin\debug\</OutDir>
     <IntDir>$(ProjectDir)tmp\</IntDir>
-    <IncludePath>$(ProjectDir)luajit\src;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)luajit\src;$(ProjectDir)include\;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)luajit\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(ProjectDir)bin\release</OutDir>
     <IntDir>$(ProjectDir)tmp\</IntDir>
-    <IncludePath>$(ProjectDir)luajit\src;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)luajit\src;$(ProjectDir)include\;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)luajit\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -133,10 +133,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\lua51.c" />
     <ClCompile Include="src\snapshot.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\snapshot.h" />
+    <ClInclude Include="include\snapshot\lua51.h" />
+    <ClInclude Include="include\snapshot\snapshot.h" />
+    <ClInclude Include="include\snapshot\types.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
