@@ -17,6 +17,9 @@
     <ClCompile Include="src\lua51.c">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="src\traverse.c">
+      <Filter>source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\snapshot\lua51.h">
@@ -25,7 +28,7 @@
     <ClInclude Include="include\snapshot\snapshot.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="include\snapshot\types.h">
+    <ClInclude Include="include\snapshot\tree.h">
       <Filter>header</Filter>
     </ClInclude>
   </ItemGroup>

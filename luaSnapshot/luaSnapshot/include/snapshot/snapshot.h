@@ -26,15 +26,15 @@ extern "C"
 #include <snapshot/lua51.h>
 #endif
 
-#include <snapshot/types.h>
-
-    typedef struct _SnapshotNode
-    {
-        int i;
-    } SnapshotNode;
+#include <snapshot/tree.h>
 
     SNAPSHOT_API void snapshot_initialize(lua_State *L);
     SNAPSHOT_API int snapshot_capture(lua_State *L);
+    extern void snapshot_traverse_table(lua_State *L, SnapshotNode* parent);
+    extern void snapshot_traverse_function(lua_State *L, SnapshotNode* parent);
+    extern void snapshot_traverse_userdata(lua_State *L, SnapshotNode* parent);
+    extern void snapshot_traverse_thread(lua_State *L, SnapshotNode* parent);
+    extern void snapshot_traverse_object(lua_State *L, SnapshotNode* parent);
 
 #ifdef __cplusplus
 }

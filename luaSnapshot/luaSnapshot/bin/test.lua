@@ -2,7 +2,13 @@ f = require "snapshot"
 
 res1 = f()
 
+function bar()
+    print(2)
+end
+
 function foo()
+    local a = 1
+    bar()
     print(1)
 end
 
