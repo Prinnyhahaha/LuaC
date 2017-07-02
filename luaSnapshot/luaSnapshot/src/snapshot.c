@@ -26,7 +26,7 @@ int snapshot_capture(lua_State * L)
     snapshot_generate_result(L, dL);
     lua_close(dL);
 
-    /*lua_pushnil(L);
+    lua_pushnil(L);
     while (lua_next(L, -2) != 0) {
         const char *p = lua_tostring(L, -2);
         const void *pp = lua_topointer(L, -2);
@@ -34,7 +34,13 @@ int snapshot_capture(lua_State * L)
         printf("%s", lua_tostring(L, -1));
         lua_pop(L, 1);
     }
-    lua_pop(L, 1);*/
+    return 1;
+}
+
+int snapshot_capture_ex(lua_State *L)
+{
+    snapshot_capture(L);
+    lua_pop(L, 1);
     return 1;
 }
 
@@ -43,15 +49,16 @@ int luaopen_snapshot(lua_State *L) {
     lua_pushcfunction(L, snapshot_capture);
     return 1;
 }
-/*
+
 int main()
 {
     lua_State *L = luaL_newstate();
 
     snapshot_initialize(L);
     int i = snapshot_capture(L);
-    printf("%d\n", i);
+    printf("===%d\n", i);
+    i = snapshot_capture(L);
+    printf("===%d\n", i);
     while (1);
     return 0;
 }
-*/

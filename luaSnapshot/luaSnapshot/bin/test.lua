@@ -25,6 +25,12 @@ t = {}
 tt = t
 sss = "lalal"
 
+file = io.open("log.log", "w")
+for k, v in pairs(res1) do
+    file:write(tostring(k) .. " >>> " .. v .. "\n")
+end
+file:close()
+--[[
 res2 = f()
 
 file = io.open("log.log", "w")
@@ -34,3 +40,4 @@ for k, v in pairs(res2) do
     end
 end
 file:close()
+]]--
