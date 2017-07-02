@@ -14,45 +14,18 @@ typedef enum _SnapshotType
     SNAPSHOT_MASK = 7
 } SnapshotType;
 
+typedef struct _SnapshotParent
+{
+    void *address;
+} SnapshotParent;
+
 typedef struct _SnapshotNode
 {
-    struct _SnapshotNode **parents;
+    SnapshotParent **parents;
     size_t parentNum;
+    size_t parentSize;
     void * address;
     SnapshotType type;
 } SnapshotNode;
-
-typedef struct _SnapshotNodeTable
-{
-    SnapshotNode header;
-    bool weakk;
-    bool weakv;
-    struct _SnapshotNodeTable *metatable;
-    SnapshotNode **keys;
-    SnapshotNode **values;
-    size_t kvNum;
-} SnapshotNodeTable;
-
-typedef struct _SnapshotNodeFunction
-{
-    SnapshotNode header;
-    SnapshotNodeTable *environment;
-    SnapshotNode *upvalue;
-} SnapshotNodeFunction;
-
-typedef struct _SnapshotNodeUserdata
-{
-    SnapshotNode header;
-    SnapshotNodeTable *metatable;
-    SnapshotNodeTable *uservalue;
-} SnapshotNodeUserdata;
-
-typedef struct _SnapshotNodeThread
-{
-    SnapshotNode header;
-    SnapshotNode *stack;
-    SnapshotNodeTable *environment;
-    SnapshotNode *upvalue;
-} SnapshotNodeThread;
 
 #endif

@@ -20,6 +20,9 @@
     <ClCompile Include="src\traverse.c">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="src\result.c">
+      <Filter>source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\snapshot\lua51.h">

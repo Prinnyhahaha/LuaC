@@ -21,6 +21,10 @@ for i = 1, 4 do
     frame[i].position = {0, 0, 0, 0}
 end
 
+t = {}
+tt = t
+sss = "lalal"
+
 res2 = f()
 
 file = io.open("log.log", "w")

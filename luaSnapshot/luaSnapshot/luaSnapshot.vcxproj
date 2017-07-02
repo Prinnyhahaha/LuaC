@@ -134,6 +134,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\lua51.c" />
+    <ClCompile Include="src\result.c" />
     <ClCompile Include="src\snapshot.c" />
     <ClCompile Include="src\traverse.c" />
   </ItemGroup>
