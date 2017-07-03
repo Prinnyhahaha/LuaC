@@ -22,26 +22,18 @@ int snapshot_capture(lua_State * L)
         lua_newtable(dL);
     }
     lua_pushvalue(L, LUA_REGISTRYINDEX);
+    //lua_getglobal(L, "_G");
     snapshot_traverse_table(L, dL, NULL, "[registry]");
-    snapshot_generate_result(L, dL);
+    //snapshot_generate_result(L, dL);
     lua_close(dL);
-
-    lua_pushnil(L);
-    while (lua_next(L, -2) != 0) {
-        const char *p = lua_tostring(L, -2);
-        const void *pp = lua_topointer(L, -2);
-        printf("%s %p ", p, pp);
-        printf("%s", lua_tostring(L, -1));
-        lua_pop(L, 1);
-    }
-    return 1;
+    return 0;
 }
 
-int snapshot_capture_ex(lua_State *L)
+int snapshot_dumb(lua_State * L)
 {
-    snapshot_capture(L);
+    lua_pushvalue(L, LUA_REGISTRYINDEX);
     lua_pop(L, 1);
-    return 1;
+    return 0;
 }
 
 int luaopen_snapshot(lua_State *L) {
@@ -53,12 +45,14 @@ int luaopen_snapshot(lua_State *L) {
 int main()
 {
     lua_State *L = luaL_newstate();
+    luaopen_base(L);
+    luaopen_table(L);
+    luaopen_io(L);
+    luaopen_string(L);
+    luaopen_math(L);
 
     snapshot_initialize(L);
-    int i = snapshot_capture(L);
-    printf("===%d\n", i);
-    i = snapshot_capture(L);
-    printf("===%d\n", i);
+    snapshot_capture(L);
     while (1);
     return 0;
 }

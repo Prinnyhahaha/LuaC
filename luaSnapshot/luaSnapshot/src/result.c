@@ -22,21 +22,26 @@ static void gen_table_desc(lua_State *dL, luaL_Buffer *b, const void * parent, c
 
 static void pdesc(lua_State *L, lua_State *dL, int idx, const char * typename)
 {
+    FILE* fp = fopen(typename, "w");
     lua_pushnil(dL);
     while (lua_next(dL, idx) != 0) {
-        luaL_Buffer b;
-        luaL_buffinit(L, &b);
-        const void * key = lua_touserdata(dL, -2);
+        const void* key = lua_touserdata(dL, -2);
+        void * p = lua_touserdata(dL, -2);
+        lua_pushlightuserdata(dL, p);
+        lua_gettable(dL, STACKPOS_MARK);
+        unsigned int size = lua_tointeger(dL, -1);
+        lua_pop(dL, 1);
+
+        fprintf(fp, "ADDR: %p -> ", key);
         if (idx == STACKPOS_FUNCTION) {
             lua_rawgetp(dL, STACKPOS_SOURCE, key);
             if (lua_isnil(dL, -1)) {
-                luaL_addstring(&b, "cfunction\n");
+                fprintf(fp, "cfunction [size: %u]\n", size);
             }
             else {
                 size_t l = 0;
                 const char * s = lua_tolstring(dL, -1, &l);
-                luaL_addlstring(&b, s, l);
-                luaL_addchar(&b, '\n');
+                fprintf(fp, "%s [size: %u]\n", s, size);
             }
             lua_pop(dL, 1);
         }
@@ -44,35 +49,87 @@ static void pdesc(lua_State *L, lua_State *dL, int idx, const char * typename)
             lua_rawgetp(dL, STACKPOS_SOURCE, key);
             size_t l = 0;
             const char * s = lua_tolstring(dL, -1, &l);
-            luaL_addlstring(&b, s, l);
-            luaL_addchar(&b, '\n');
+            fprintf(fp, "%s [size: %u]\n", s, size);
             lua_pop(dL, 1);
         }
         else {
-            luaL_addstring(&b, typename);
-            luaL_addchar(&b, '\n');
+            fprintf(fp, "%s [size: %u]\n", typename, size);
         }
         lua_pushnil(dL);
         while (lua_next(dL, -2) != 0) {
             const void * parent = lua_touserdata(dL, -2);
             const char * desc = luaL_checkstring(dL, -1);
-            gen_table_desc(dL, &b, parent, desc);
+            fprintf(fp, "    %p : %s\n", parent, desc);
             lua_pop(dL, 1);
         }
-        luaL_pushresult(&b);
-        lua_rawsetp(L, -2, key);
         lua_pop(dL, 1);
+
+        //luaL_Buffer b;
+        //luaL_buffinit(L, &b);
+        //const void * key = lua_touserdata(dL, -2);
+
+        //void * p = lua_touserdata(dL, -2);
+        //lua_pushlightuserdata(dL, p);
+        //lua_gettable(dL, STACKPOS_MARK);
+        //unsigned int size = lua_tointeger(dL, -1);
+        //lua_pop(dL, 1);
+
+        //if (idx == STACKPOS_FUNCTION) {
+        //    lua_rawgetp(dL, STACKPOS_SOURCE, key);
+        //    if (lua_isnil(dL, -1)) {
+        //        char tmp[50];
+        //        sprintf(tmp, "cfunction size : %u", size);
+        //        luaL_addstring(&b, tmp);
+        //        luaL_addchar(&b, '\n');
+        //    }
+        //    else {
+        //        size_t l = 0;
+        //        const char * s = lua_tolstring(dL, -1, &l);
+        //        luaL_addlstring(&b, s, l);
+        //        char tmp[50];
+        //        sprintf(tmp, " size : %u", size);
+        //        luaL_addstring(&b, tmp);
+        //        luaL_addchar(&b, '\n');
+        //    }
+        //    lua_pop(dL, 1);
+        //}
+        //else if (idx == STACKPOS_THREAD) {
+        //    lua_rawgetp(dL, STACKPOS_SOURCE, key);
+        //    size_t l = 0;
+        //    const char * s = lua_tolstring(dL, -1, &l);
+        //    luaL_addlstring(&b, s, l);
+        //    char tmp[50];
+        //    sprintf(tmp, " size : %u", size);
+        //    luaL_addstring(&b, tmp);
+        //    luaL_addchar(&b, '\n');
+        //    lua_pop(dL, 1);
+        //}
+        //else {
+        //    char tmp[50];
+        //    sprintf(tmp, "%s size : %u", typename, size);
+        //    luaL_addstring(&b, tmp);
+        //    luaL_addchar(&b, '\n');
+        //}
+        //lua_pushnil(dL);
+        //while (lua_next(dL, -2) != 0) {
+        //    const void * parent = lua_touserdata(dL, -2);
+        //    const char * desc = luaL_checkstring(dL, -1);
+        //    gen_table_desc(dL, &b, parent, desc);
+        //    lua_pop(dL, 1);
+        //}
+        //luaL_pushresult(&b);
+
+        //fprintf(fp, "%p ", key);
+        //fprintf(fp, "%s", lua_tostring(L, -1));
+        //lua_pop(L, 1);
+
+        //lua_pop(dL, 1);
     }
+    fclose(fp);
+    fp = NULL;
 }
 
 void snapshot_generate_result(lua_State *L, lua_State *dL) {
-    int count = 0;
-    count += count_table(dL, STACKPOS_TABLE);
-    count += count_table(dL, STACKPOS_FUNCTION);
-    count += count_table(dL, STACKPOS_USERDATA);
-    count += count_table(dL, STACKPOS_THREAD);
-    count += count_table(dL, STACKPOS_STRING);
-    lua_createtable(L, 0, count);
     pdesc(L, dL, STACKPOS_TABLE, "table");
     pdesc(L, dL, STACKPOS_USERDATA, "userdata");
     pdesc(L, dL, STACKPOS_FUNCTION, "function");

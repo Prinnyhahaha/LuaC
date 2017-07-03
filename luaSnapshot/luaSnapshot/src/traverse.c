@@ -84,14 +84,20 @@ static const char* keystring(lua_State *L, int index, char *buffer)
 
 void snapshot_traverse_table(lua_State *L, lua_State *dL, const void * parent, const char * desc)
 {
-    printf("break point %s\n", desc);
     const void * t = readobject(L, dL, parent, desc);
     if (t == NULL)
         return;
 
+    /* GCtable + array + hashnode(not including key/value's GCobject) */
+    cTValue* tv = L->top - 1;
+    assert(tv->it == LJ_TTAB);
+    GCtab* tbl = &((GCobj*)(uintptr_t)(tv->gcr.gcptr32))->tab;
+    unsigned int size = sizeof(GCtab) + sizeof(TValue) * tbl->asize + sizeof(Node) * (tbl->hmask + 1);
+    lua_pushinteger(dL, size);
+    lua_rawsetp(dL, STACKPOS_MARK, t);
+
     bool weakk = false;
     bool weakv = false;
-    printf("---break point %s\n", desc);
     if (lua_getmetatable(L, -1)) {
         lua_pushliteral(L, "__mode");
         lua_rawget(L, -2);
@@ -105,29 +111,22 @@ void snapshot_traverse_table(lua_State *L, lua_State *dL, const void * parent, c
             }
         }
         lua_pop(L, 1);
-
         luaL_checkstack(L, LUA_MINSTACK, NULL);
         snapshot_traverse_table(L, dL, t, "[metatable]");
     }
 
-    printf("===break point %s\n", desc);
     lua_pushnil(L);
     while (lua_next(L, -2) != 0) {
         if (weakv) {
             lua_pop(L, 1);
         }
         else {
-            char temp[500];
+            char temp[50];
             const char * desc = keystring(L, -2, temp);
             snapshot_traverse_object(L, dL, t, desc);
-            printf("+++break point %s\n", desc);
         }
         if (!weakk) {
-            printf("//////////////%d\n", lua_gettop(L));
-            const void* p = lua_topointer(L, -1);
-            printf("1***%p %s\n", p, desc);
             lua_pushvalue(L, -1);
-            printf("2***%p %s\n", p, desc);
             snapshot_traverse_object(L, dL, t, "[key]");
         }
     }
@@ -140,6 +139,24 @@ void snapshot_traverse_function(lua_State *L, lua_State *dL, const void * parent
     const void * t = readobject(L, dL, parent, desc);
     if (t == NULL)
         return;
+
+    /* GCfunction + upvalue + protosize(not including upvalues' GCobject) */
+    cTValue* tv = L->top - 1;
+    assert(tv->it == LJ_TFUNC);
+    GCfunc* func = &((GCobj*)(uintptr_t)(tv->gcr.gcptr32))->fn;
+    unsigned int size;
+    if (func->c.ffid == FF_LUA)
+    {
+        size = (sizeof(GCfuncL) - sizeof(GCRef) + sizeof(GCRef)*((MSize)func->l.nupvalues));
+        size += ((GCproto*)(uintptr_t)(func->l.pc.ptr32))->sizept;
+    }
+    else
+    {
+        size = (sizeof(GCfuncC) - sizeof(TValue) + sizeof(TValue)*((MSize)func->c.nupvalues));
+        size += ((GCproto*)(uintptr_t)(func->c.pc.ptr32))->sizept;
+    }
+    lua_pushinteger(dL, size);
+    lua_rawsetp(dL, STACKPOS_MARK, t);
 
 #if LUA_VERSION_NUM == 501
     lua_getfenv(L, -1);
@@ -171,7 +188,7 @@ void snapshot_traverse_function(lua_State *L, lua_State *dL, const void * parent
         lua_getinfo(L, ">S", &ar);
         luaL_Buffer b;
         luaL_buffinit(dL, &b);
-        luaL_addstring(&b, "[function] ");
+        luaL_addstring(&b, "lfunction ");
         luaL_addstring(&b, ar.short_src);
         char tmp[128];
         sprintf(tmp, ":%d", ar.linedefined);
@@ -186,6 +203,14 @@ void snapshot_traverse_userdata(lua_State *L, lua_State *dL, const void * parent
     const void * t = readobject(L, dL, parent, desc);
     if (t == NULL)
         return;
+
+    /* GCudata + payloadsize */
+    cTValue* tv = L->top - 1;
+    assert(tv->it == LJ_TUDATA);
+    GCudata* ud = &((GCobj*)(uintptr_t)(tv->gcr.gcptr32))->ud;
+    unsigned int size = sizeof(GCudata) + ud->len;
+    lua_pushinteger(dL, size);
+    lua_rawsetp(dL, STACKPOS_MARK, t);
 
     if (lua_getmetatable(L, -1)) {
         snapshot_traverse_table(L, dL, t, "[metatable]");
@@ -206,6 +231,15 @@ void snapshot_traverse_thread(lua_State *L, lua_State *dL, const void * parent, 
     const void * t = readobject(L, dL, parent, desc);
     if (t == NULL)
         return;
+
+    /* lua_State + stack(not include stack values' GCobject) */
+    cTValue* tv = L->top - 1;
+    assert(tv->it == LJ_TTHREAD);
+    lua_State* th = &((GCobj*)(uintptr_t)(tv->gcr.gcptr32))->th;
+    unsigned int size = sizeof(lua_State) + sizeof(TValue) * th->stacksize;
+    lua_pushinteger(dL, size);
+    lua_rawsetp(dL, STACKPOS_MARK, t);
+
     int level = 0;
     lua_State *cL = lua_tothread(L, -1);
     if (cL == L) {
@@ -225,7 +259,7 @@ void snapshot_traverse_thread(lua_State *L, lua_State *dL, const void * parent, 
     lua_Debug ar;
     luaL_Buffer b;
     luaL_buffinit(dL, &b);
-    luaL_addstring(&b, "[thread] ");
+    luaL_addstring(&b, "thread ");
     while (lua_getstack(cL, level, &ar)) {
         char tmp[128];
         lua_getinfo(cL, "Sl", &ar);
@@ -258,27 +292,21 @@ void snapshot_traverse_object(lua_State *L, lua_State *dL, const void * parent, 
     int t = lua_type(L, -1);
     switch (t) {
     case LUA_TTABLE:
-        printf("tbl\n");
         snapshot_traverse_table(L, dL, parent, desc);
         break;
     case LUA_TUSERDATA:
-        printf("ud\n");
         snapshot_traverse_userdata(L, dL, parent, desc);
         break;
     case LUA_TFUNCTION:
-        printf("func\n");
         snapshot_traverse_function(L, dL, parent, desc);
         break;
     case LUA_TTHREAD:
-        printf("thread\n");
         snapshot_traverse_thread(L, dL, parent, desc);
         break;
     case LUA_TSTRING:
-        printf("str\n");
         snapshot_traverse_string(L, dL, parent, desc);
         break;
     default:
-        printf("%d\n", t);
         lua_pop(L, 1);
         break;
     }
@@ -286,12 +314,20 @@ void snapshot_traverse_object(lua_State *L, lua_State *dL, const void * parent, 
 
 void snapshot_traverse_string(lua_State * L, lua_State * dL, const void * parent, const char * desc)
 {
-    printf("ooo\n");
     const char *str = lua_tostring(L, -1);
     char tmp[128];
     sprintf(tmp, "%s \"%s\"", desc, str);
     const void * t = readobject(L, dL, parent, tmp);
     if (t == NULL)
         return;
+
+    /* GCstr + payloadsize */
+    cTValue* tv = L->top - 1;
+    assert(tv->it == LJ_TSTR);
+    GCstr* gcstr = &((GCobj*)(uintptr_t)(tv->gcr.gcptr32))->str;
+    unsigned int size = sizeof(GCstr) + gcstr->len;
+    lua_pushinteger(dL, size);
+    lua_rawsetp(dL, STACKPOS_MARK, t);
+
     lua_pop(L, 1);
 }

@@ -1,6 +1,6 @@
 f = require "snapshot"
 
-res1 = f()
+--res1 = f()
 
 function bar()
     print(2)
@@ -25,19 +25,18 @@ t = {}
 tt = t
 sss = "lalal"
 
-file = io.open("log.log", "w")
-for k, v in pairs(res1) do
-    file:write(tostring(k) .. " >>> " .. v .. "\n")
-end
-file:close()
---[[
+--file = io.open("log.log", "w")
+--for k, v in pairs(res1) do
+--    file:write(tostring(k) .. " >>> " .. v .. "\n")
+--end
+--file:close()
+
 res2 = f()
 
-file = io.open("log.log", "w")
-for k, v in pairs(res2) do
-    if res1[k] == nil then
-        file:write(tostring(k) .. " >>> " .. v .. "\n")
-    end
-end
-file:close()
-]]--
+--file = io.open("log.log", "w")
+--for k, v in pairs(res2) do
+--    if res1[k] == nil then
+--        file:write(tostring(k) .. " >>> " .. v .. "\n")
+--    end
+--end
+--file:close()

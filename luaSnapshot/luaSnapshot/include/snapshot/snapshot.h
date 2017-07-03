@@ -22,6 +22,8 @@ extern "C"
 
 #include <lua.h>
 #include <lauxlib.h>
+#include <lualib.h>
+#include <lj_obj.h>
 #if LUA_VERSION_NUM == 501
 #include <snapshot/lua51.h>
 #endif
@@ -38,6 +40,7 @@ extern "C"
 
     SNAPSHOT_API void snapshot_initialize(lua_State *L);
     SNAPSHOT_API int snapshot_capture(lua_State *L);
+    SNAPSHOT_API int snapshot_dumb(lua_State* L);
     SNAPSHOT_API int luaopen_snapshot(lua_State *L);
 
     extern void snapshot_traverse_table(lua_State *L, lua_State *dL, const void* parent, const char* desc);
