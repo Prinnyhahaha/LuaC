@@ -1,7 +1,27 @@
 #include <snapshot/snapshot.h>
 #include <assert.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+
+static FILE* debug_fp = NULL;
+static bool enable_debug = true;
+
+static void debug_log(const char* fmt, ...)
+{
+    if (!enable_debug)
+        return;
+    if (debug_fp == NULL)
+        debug_fp = fopen("traverse.log", "w");
+    if (debug_fp)
+    {
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(debug_fp, fmt, args);
+        va_end(args);
+        fflush(debug_fp);
+    }
+}
 
 static bool is_marked(lua_State *dL, const void *p)
 {
@@ -87,6 +107,7 @@ void snapshot_traverse_table(lua_State *L, lua_State *dL, const void * parent, c
     const void * t = readobject(L, dL, parent, desc);
     if (t == NULL)
         return;
+    debug_log("traverse table %p, parent %p as %s\n", t, parent, desc);
 
     /* GCtable + array + hashnode(not including key/value's GCobject) */
     cTValue* tv = L->top - 1;
@@ -139,6 +160,7 @@ void snapshot_traverse_function(lua_State *L, lua_State *dL, const void * parent
     const void * t = readobject(L, dL, parent, desc);
     if (t == NULL)
         return;
+    debug_log("traverse function %p, parent %p as %s\n", t, parent, desc);
 
     /* GCfunction + upvalue + protosize(not including upvalues' GCobject) */
     cTValue* tv = L->top - 1;
@@ -203,6 +225,7 @@ void snapshot_traverse_userdata(lua_State *L, lua_State *dL, const void * parent
     const void * t = readobject(L, dL, parent, desc);
     if (t == NULL)
         return;
+    debug_log("traverse userdata %p, parent %p as %s\n", t, parent, desc);
 
     /* GCudata + payloadsize */
     cTValue* tv = L->top - 1;
@@ -231,6 +254,7 @@ void snapshot_traverse_thread(lua_State *L, lua_State *dL, const void * parent, 
     const void * t = readobject(L, dL, parent, desc);
     if (t == NULL)
         return;
+    debug_log("traverse thread %p, parent %p as %s\n", t, parent, desc);
 
     /* lua_State + stack(not include stack values' GCobject) */
     cTValue* tv = L->top - 1;
@@ -307,6 +331,7 @@ void snapshot_traverse_object(lua_State *L, lua_State *dL, const void * parent, 
         snapshot_traverse_string(L, dL, parent, desc);
         break;
     default:
+        debug_log("traverse nogc\n");
         lua_pop(L, 1);
         break;
     }
@@ -315,11 +340,12 @@ void snapshot_traverse_object(lua_State *L, lua_State *dL, const void * parent, 
 void snapshot_traverse_string(lua_State * L, lua_State * dL, const void * parent, const char * desc)
 {
     const char *str = lua_tostring(L, -1);
-    char tmp[128];
+    char *tmp = (char*)malloc(strlen(str) + 4 + strlen(desc));
     sprintf(tmp, "%s \"%s\"", desc, str);
     const void * t = readobject(L, dL, parent, tmp);
     if (t == NULL)
         return;
+    debug_log("traverse string %p, parent %p as %s\n", t, parent, tmp);
 
     /* GCstr + payloadsize */
     cTValue* tv = L->top - 1;
@@ -329,5 +355,6 @@ void snapshot_traverse_string(lua_State * L, lua_State * dL, const void * parent
     lua_pushinteger(dL, size);
     lua_rawsetp(dL, STACKPOS_MARK, t);
 
+    free(tmp);
     lua_pop(L, 1);
 }
