@@ -210,7 +210,6 @@ void snapshot_traverse_function(lua_State *L, lua_State *dL, const void * parent
         lua_getinfo(L, ">S", &ar);
         luaL_Buffer b;
         luaL_buffinit(dL, &b);
-        luaL_addstring(&b, "lfunction ");
         luaL_addstring(&b, ar.short_src);
         char tmp[128];
         sprintf(tmp, ":%d", ar.linedefined);
@@ -283,7 +282,7 @@ void snapshot_traverse_thread(lua_State *L, lua_State *dL, const void * parent, 
     lua_Debug ar;
     luaL_Buffer b;
     luaL_buffinit(dL, &b);
-    luaL_addstring(&b, "thread ");
+    luaL_addstring(&b, "");
     while (lua_getstack(cL, level, &ar)) {
         char tmp[128];
         lua_getinfo(cL, "Sl", &ar);
