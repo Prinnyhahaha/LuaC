@@ -3,6 +3,7 @@
 
 SnapshotNode* result = NULL;
 int resultIdx = 0;
+unsigned int totalSize = 0;
 
 static FILE* debug_fp = NULL;
 static bool enable_debug = true;
@@ -134,12 +135,14 @@ static void generate(lua_State* L, lua_State* dL, int idx)
         result[resultIdx].parents = parents;
         result[resultIdx].reference = reference;
         result[resultIdx].parentNum = parentNum;
+        totalSize += size;
         resultIdx++;
     }
 }
 
 void snapshot_generate_result(lua_State *L, lua_State *dL)
 {
+    totalSize = 0;
     int num = 0;
     num += count_table(dL, STACKPOS_TABLE);
     num += count_table(dL, STACKPOS_FUNCTION);
@@ -157,6 +160,7 @@ void snapshot_generate_result(lua_State *L, lua_State *dL)
     generate(L, dL, STACKPOS_USERDATA);
     generate(L, dL, STACKPOS_THREAD);
     generate(L, dL, STACKPOS_STRING);
+    debug_log("total size: %u\n", totalSize);
 }
 
 void snapshot_destroy_result()

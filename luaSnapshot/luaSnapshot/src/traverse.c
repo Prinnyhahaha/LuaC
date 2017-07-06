@@ -170,12 +170,12 @@ void snapshot_traverse_function(lua_State *L, lua_State *dL, const void * parent
     if (func->c.ffid == FF_LUA)
     {
         size = (sizeof(GCfuncL) - sizeof(GCRef) + sizeof(GCRef)*((MSize)func->l.nupvalues));
-        size += ((GCproto*)(uintptr_t)(func->l.pc.ptr32))->sizept;
+        size += ((GCproto*)(uintptr_t)(func->l.pc.ptr32) - 1)->sizept;
     }
     else
     {
         size = (sizeof(GCfuncC) - sizeof(TValue) + sizeof(TValue)*((MSize)func->c.nupvalues));
-        size += ((GCproto*)(uintptr_t)(func->c.pc.ptr32))->sizept;
+        size += ((GCproto*)(uintptr_t)(func->c.pc.ptr32) - 1)->sizept;
     }
     lua_pushinteger(dL, size);
     lua_rawsetp(dL, STACKPOS_MARK, t);
