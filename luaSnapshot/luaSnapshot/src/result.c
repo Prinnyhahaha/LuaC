@@ -122,7 +122,7 @@ static void generate(lua_State* L, lua_State* dL, int idx)
             reference[parentIdx] = (char*)malloc(strlen(desc) + 1);
             strcpy(reference[parentIdx], desc);
             parentIdx++;
-            debug_log("    parent: %p, %s", parent, desc);
+            debug_log("    parent: %p, %s\n", parent, desc);
             lua_pop(dL, 1);
         }
         lua_pop(dL, 1);
