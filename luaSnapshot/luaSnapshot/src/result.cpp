@@ -1,8 +1,20 @@
 #include <snapshot/snapshot.h>
 #include <stdarg.h>
 
-SnapshotNode* result = NULL;
-int resultIdx = 0;
+#include <vector>
+#include <map>
+#include <string>
+
+using std::vector;
+using std::map;
+using std::string;
+
+extern vector<map<const void*, SnapshotNode*>> virtualStack;
+extern map<const void*, string> sourceTable;
+extern map<const void*, bool> markTable;
+extern SnapshotNode* result;
+extern int nResult;
+
 unsigned int totalSize = 0;
 
 static FILE* debug_fp = NULL;
@@ -24,19 +36,7 @@ static void debug_log(const char* fmt, ...)
     }
 }
 
-static int count_table(lua_State *L, int idx)
-{
-    int n = 0;
-    lua_pushnil(L);
-    while (lua_next(L, idx) != 0)
-    {
-        ++n;
-        lua_pop(L, 1);
-    }
-    return n;
-}
-
-static void generate(lua_State* L, lua_State* dL, int idx)
+static void generate(lua_State* L, int idx)
 {
     debug_log("generate %d...\n", idx);
     lua_pushnil(dL);
@@ -128,38 +128,38 @@ static void generate(lua_State* L, lua_State* dL, int idx)
         }
         lua_pop(dL, 1);
 
-        result[resultIdx].address = address;
-        result[resultIdx].type = type;
-        result[resultIdx].debuginfo = debug_info;
-        result[resultIdx].size = size;
-        result[resultIdx].parents = parents;
-        result[resultIdx].reference = reference;
-        result[resultIdx].parentNum = parentNum;
+        result[nResult].address = address;
+        result[nResult].type = type;
+        result[nResult].debuginfo = debug_info;
+        result[nResult].size = size;
+        result[nResult].parents = parents;
+        result[nResult].reference = reference;
+        result[nResult].nParent = parentNum;
         totalSize += size;
-        resultIdx++;
+        nResult++;
     }
 }
 
-void snapshot_generate_result(lua_State *L, lua_State *dL)
+void snapshot_generate_result(lua_State *L)
 {
     totalSize = 0;
-    int num = 0;
-    num += count_table(dL, STACKPOS_TABLE);
-    num += count_table(dL, STACKPOS_FUNCTION);
-    num += count_table(dL, STACKPOS_USERDATA);
-    num += count_table(dL, STACKPOS_THREAD);
-    num += count_table(dL, STACKPOS_STRING);
+    size_t num = 0;
+    num += virtualStack[STACKPOS_TABLE - 1].size();
+    num += virtualStack[STACKPOS_FUNCTION - 1].size();
+    num += virtualStack[STACKPOS_USERDATA - 1].size();
+    num += virtualStack[STACKPOS_THREAD - 1].size();
+    num += virtualStack[STACKPOS_STRING - 1].size();
     debug_log("count: %d\n", num);
     result = (SnapshotNode*)malloc(sizeof(SnapshotNode) * num);
     debug_log("result: %p\n", result);
     if (result == NULL)
         return;
-    resultIdx = 0;
-    generate(L, dL, STACKPOS_TABLE);
-    generate(L, dL, STACKPOS_FUNCTION);
-    generate(L, dL, STACKPOS_USERDATA);
-    generate(L, dL, STACKPOS_THREAD);
-    generate(L, dL, STACKPOS_STRING);
+    nResult = 0;
+    generate(L, STACKPOS_TABLE);
+    generate(L, STACKPOS_FUNCTION);
+    generate(L, STACKPOS_USERDATA);
+    generate(L, STACKPOS_THREAD);
+    generate(L, STACKPOS_STRING);
     debug_log("total size: %u\n", totalSize);
 }
 
@@ -168,14 +168,14 @@ void snapshot_destroy_result()
     if (result == NULL)
         return;
     int i, j;
-    for (i = 0; i < resultIdx; i++)
+    for (i = 0; i < nResult; i++)
     {
         if (result[i].debuginfo)
         {
             free(result[i].debuginfo);
             result[i].debuginfo = NULL;
         }
-        for (j = 0; j < result[i].parentNum; j++)
+        for (j = 0; j < result[i].nParent; j++)
         {
             free(result[i].reference[j]);
         }

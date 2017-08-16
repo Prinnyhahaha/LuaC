@@ -1,11 +1,8 @@
 #ifndef __SNAPSHOT_H__
 #define __SNAPSHOT_H__
 
-#ifdef __cplusplus
 extern "C"
 {
-#endif
-
 #ifdef _WIN32
 #ifdef SNAPSHOT_DLL
 #ifdef SNAPSHOT_BUILD_LIB
@@ -46,18 +43,15 @@ extern "C"
     SNAPSHOT_API int snapshot_get_parent_num(int index);
     SNAPSHOT_API int snapshot_get_parents(const int index, const int len, const void** pout, char** rout);
 
-    extern void snapshot_traverse_table(lua_State *L, lua_State *dL, const void* parent, const char* desc);
-    extern void snapshot_traverse_function(lua_State *L, lua_State *dL, const void* parent, const char* desc);
-    extern void snapshot_traverse_userdata(lua_State *L, lua_State *dL, const void* parent, const char* desc);
-    extern void snapshot_traverse_thread(lua_State *L, lua_State *dL, const void* parent, const char* desc);
-    extern void snapshot_traverse_object(lua_State *L, lua_State *dL, const void* parent, const char* desc);
-    extern void snapshot_traverse_string(lua_State *L, lua_State *dL, const void* parent, const char* desc);
+    extern void snapshot_traverse_init();
+    extern void snapshot_traverse_table(lua_State *L, const void* parent, const char* desc);
+    extern void snapshot_traverse_function(lua_State *L, const void* parent, const char* desc);
+    extern void snapshot_traverse_userdata(lua_State *L, const void* parent, const char* desc);
+    extern void snapshot_traverse_thread(lua_State *L, const void* parent, const char* desc);
+    extern void snapshot_traverse_object(lua_State *L, const void* parent, const char* desc);
+    extern void snapshot_traverse_string(lua_State *L, const void* parent, const char* desc);
 
-    extern void snapshot_generate_result(lua_State *L, lua_State *dL);
+    extern void snapshot_generate_result(lua_State *L);
     extern void snapshot_destroy_result();
-
-#ifdef __cplusplus
 }
-#endif
-
 #endif

@@ -133,10 +133,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\lua51.c" />
-    <ClCompile Include="src\result.c" />
-    <ClCompile Include="src\snapshot.c" />
-    <ClCompile Include="src\traverse.c" />
+    <ClCompile Include="src\lua51.cpp" />
+    <ClCompile Include="src\result.cpp" />
+    <ClCompile Include="src\snapshot.cpp" />
+    <ClCompile Include="src\traverse.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\snapshot\lua51.h" />

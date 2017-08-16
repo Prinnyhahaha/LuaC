@@ -31,7 +31,7 @@ typedef struct _SnapshotNode
         [local] %s : %s:%d //variable name; chunk name; lines
         %s                 //key of the value
     */
-    unsigned int parentNum;//Numbers of references
+    unsigned int nParent;//Numbers of references
 } SnapshotNode;
 
 #endif
