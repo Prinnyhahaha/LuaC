@@ -9,7 +9,7 @@ using std::vector;
 using std::map;
 using std::string;
 
-extern vector<map<const void*, SnapshotNode*>> virtualStack;
+extern vector<map<const void*, TSnapshotNode*> > virtualStack;
 extern map<const void*, string> sourceTable;
 extern map<const void*, bool> markTable;
 extern SnapshotNode* result;
@@ -39,9 +39,11 @@ static void debug_log(const char* fmt, ...)
 static void generate(lua_State* L, int idx)
 {
     debug_log("generate %d...\n", idx);
-    lua_pushnil(dL);
-    while (lua_next(dL, idx) != 0) {
-        const void* address = lua_touserdata(dL, -2);
+    map<const void*, TSnapshotNode*>* tbl = &virtualStack[idx - 1];
+    map<const void*, TSnapshotNode*>::iterator tblIter = tbl->begin();
+    for (; tblIter != tbl->end(); tblIter++)
+    {
+        const void* address = tblIter->first;
         debug_log("  addr: %p\n", address);
 
         SnapshotType type;
@@ -53,32 +55,26 @@ static void generate(lua_State* L, int idx)
             debug_info = NULL;
             break;
         case STACKPOS_FUNCTION:
-            lua_rawgetp(dL, STACKPOS_SOURCE, address);
-            if (lua_isnil(dL, -1)) {
+            if (sourceTable.find(address) == sourceTable.end())
+            {
                 type = SNAPSHOT_C_FUNCTION;
                 debug_info = NULL;
             }
             else {
-                size_t l = 0;
-                const char * s = lua_tolstring(dL, -1, &l);
+                size_t l = sourceTable[address].size();
                 type = SNAPSHOT_LUA_FUNCTION;
                 debug_info = (char*)malloc(l + 1);
-                strcpy(debug_info, s);
+                strcpy(debug_info, sourceTable[address].c_str());
             }
-            lua_pop(dL, 1);
             break;
         case STACKPOS_USERDATA:
             type = SNAPSHOT_USERDATA;
             debug_info = NULL;
             break;
         case STACKPOS_THREAD:
-            lua_rawgetp(dL, STACKPOS_SOURCE, address);
-            size_t l = 0;
-            const char * s = lua_tolstring(dL, -1, &l);
             type = SNAPSHOT_THREAD;
-            debug_info = (char*)malloc(l + 1);
-            strcpy(debug_info, s);
-            lua_pop(dL, 1);
+            debug_info = (char*)malloc(sourceTable[address].size() + 1);
+            strcpy(debug_info, sourceTable[address].c_str());
             break;
         case STACKPOS_STRING:
             type = SNAPSHOT_STRING;
@@ -98,35 +94,24 @@ static void generate(lua_State* L, int idx)
             debug_log("  type: %d\n", type);
         }
 
-        void * p = lua_touserdata(dL, -2);
-        lua_pushlightuserdata(dL, p);
-        lua_gettable(dL, STACKPOS_MARK);
-        unsigned int size = lua_tointeger(dL, -1);
-        lua_pop(dL, 1);
+        unsigned int size = tblIter->second->size;
         debug_log("  size %u\n", size);
 
-        unsigned int parentNum = 0;
-        lua_pushnil(dL);
-        while (lua_next(dL, -2) != 0) {
-            parentNum++;
-            lua_pop(dL, 1);
-        }
+        unsigned int nParent = tblIter->second->parents.size();
+        debug_log("  parent num %u\n", nParent);
 
-        const void ** parents = (const void**)malloc(sizeof(void*) * parentNum);
-        char ** reference = (char**)malloc(sizeof(char*) * parentNum);
+        const void ** parents = (const void**)malloc(sizeof(void*) * nParent);
+        char ** reference = (char**)malloc(sizeof(char*) * nParent);
         int parentIdx = 0;
-        lua_pushnil(dL);
-        while (lua_next(dL, -2) != 0) {
-            const void * parent = lua_touserdata(dL, -2);
-            const char * desc = luaL_checkstring(dL, -1);
+        for (map<const void*, string>::iterator it = tblIter->second->parents.begin(); it != tblIter->second->parents.end(); it++)
+        {
+            const void * parent = it->first;
             parents[parentIdx] = parent;
-            reference[parentIdx] = (char*)malloc(strlen(desc) + 1);
-            strcpy(reference[parentIdx], desc);
+            reference[parentIdx] = (char*)malloc(it->second.size() + 1);
+            strcpy(reference[parentIdx], it->second.c_str());
             parentIdx++;
-            debug_log("    parent: %p, %s\n", parent, desc);
-            lua_pop(dL, 1);
+            debug_log("    parent: %p, %s\n", parent, reference[parentIdx - 1]);
         }
-        lua_pop(dL, 1);
 
         result[nResult].address = address;
         result[nResult].type = type;
@@ -134,9 +119,12 @@ static void generate(lua_State* L, int idx)
         result[nResult].size = size;
         result[nResult].parents = parents;
         result[nResult].reference = reference;
-        result[nResult].nParent = parentNum;
+        result[nResult].nParent = nParent;
         totalSize += size;
         nResult++;
+
+        tblIter->second->parents.clear();
+        delete tblIter->second;
     }
 }
 
@@ -167,15 +155,14 @@ void snapshot_destroy_result()
 {
     if (result == NULL)
         return;
-    int i, j;
-    for (i = 0; i < nResult; i++)
+    for (int i = 0; i < nResult; i++)
     {
         if (result[i].debuginfo)
         {
             free(result[i].debuginfo);
             result[i].debuginfo = NULL;
         }
-        for (j = 0; j < result[i].nParent; j++)
+        for (unsigned int j = 0; j < result[i].nParent; j++)
         {
             free(result[i].reference[j]);
         }

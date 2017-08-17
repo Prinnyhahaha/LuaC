@@ -1,7 +1,6 @@
 //#define SNAPSHOT_BUILD_LIB 1
 #include <snapshot/snapshot.h>
 #include <stdbool.h>
-#include <stdlib.h>
 
 #include <vector>
 #include <map>
@@ -11,11 +10,32 @@ using std::vector;
 using std::map;
 using std::string;
 
-static vector<map<const void*, SnapshotNode*>> virtualStack;
-static map<const void*, string> sourceTable;
-static map<const void*, bool> markTable;
-static SnapshotNode* result;
-static int nResult;
+vector<map<const void*, TSnapshotNode*> > virtualStack;
+map<const void*, string> sourceTable;
+map<const void*, bool> markTable;
+SnapshotNode* result;
+int nResult;
+
+/* DEBUG_LOG */
+static FILE* debug_fp = NULL;
+static bool enable_debug = true;
+
+static void debug_log(const char* fmt, ...)
+{
+    if (!enable_debug)
+        return;
+    if (debug_fp == NULL)
+        debug_fp = fopen("snapshot.log", "w");
+    if (debug_fp)
+    {
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(debug_fp, fmt, args);
+        va_end(args);
+        fflush(debug_fp);
+    }
+}
+/* DEBUG_LOG */
 
 static bool inited = false;
 
@@ -32,6 +52,7 @@ int snapshot_capture(lua_State * L)
     snapshot_destroy_result();
     lua_pushvalue(L, LUA_REGISTRYINDEX);
     //lua_getglobal(L, "_G");
+    snapshot_traverse_init();
     snapshot_traverse_table(L, NULL, "[registry]");
     snapshot_generate_result(L);
     return 0;

@@ -12,13 +12,11 @@ using std::vector;
 using std::map;
 using std::string;
 
-extern vector<map<const void*, SnapshotNode*>> virtualStack;
+extern vector<map<const void*, TSnapshotNode*> > virtualStack;
 extern map<const void*, string> sourceTable;
 extern map<const void*, bool> markTable;
-extern SnapshotNode* result;
-extern int nResult;
 
-#pragma region debuglog
+/* DEBUG_LOG */
 static FILE* debug_fp = NULL;
 static bool enable_debug = true;
 
@@ -37,11 +35,15 @@ static void debug_log(const char* fmt, ...)
         fflush(debug_fp);
     }
 }
-#pragma endregion
+/* DEBUG_LOG */
 
 void snapshot_traverse_init()
 {
     virtualStack.reserve(5);
+    for (int i = 0; i < 5; i++)
+    {
+        virtualStack.push_back(map<const void*, TSnapshotNode*>());
+    }
     for (size_t i = 0; i < virtualStack.size(); i++)
     {
         virtualStack[i].clear();
@@ -52,7 +54,7 @@ void snapshot_traverse_init()
 
 static bool is_marked(const void *p)
 {
-    if (!markTable[p])
+    if (markTable.find(p) == markTable.end())
     {
         markTable[p] = true;
         return false;
@@ -86,24 +88,17 @@ static const void* readobject(lua_State *L, const void *parent, const char *desc
 
     const void * p = lua_topointer(L, -1);
     if (is_marked(p)) {
-        SnapshotNode* pnode = virtualStack[tidx - 1][p];
-        if (pnode != NULL)
+        if (virtualStack[tidx - 1].find(p) != virtualStack[tidx - 1].end())
         {
-            pnode->parents[pnode->nParent] = parent;
-            pnode->reference[pnode->nParent] = (char*)malloc(strlen(desc) + 1);
-            strcpy(pnode->reference[pnode->nParent], desc);
-            pnode->nParent++;
+            virtualStack[tidx - 1][p]->parents[parent] = desc;
         }
         lua_pop(L, 1);
         return NULL;
     }
 
-    SnapshotNode* pnode = (SnapshotNode*)malloc(sizeof(SnapshotNode));
+    TSnapshotNode* pnode = new TSnapshotNode();
     virtualStack[tidx - 1][p] = pnode;
-    pnode->parents[0] = parent;
-    pnode->reference[0] = (char*)malloc(strlen(desc) + 1);
-    strcpy(pnode->reference[0], desc);
-    pnode->nParent = 1;
+    pnode->parents[parent] = desc;
     return p;
 }
 
@@ -347,7 +342,7 @@ void snapshot_traverse_object(lua_State *L, const void * parent, const char *des
         snapshot_traverse_string(L, parent, desc);
         break;
     default:
-        debug_log("traverse nogc\n");
+        debug_log("traverse non-GCobj\n");
         lua_pop(L, 1);
         break;
     }

@@ -25,3 +25,4 @@ sysinfo.txt
 #visual studio
 *.VC.db
 luaSnapshot/luaSnapshot/tmp/
+luaSnapshot/.vs/
