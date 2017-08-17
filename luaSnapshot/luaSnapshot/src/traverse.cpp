@@ -39,7 +39,7 @@ static void debug_log(const char* fmt, ...)
 
 void snapshot_traverse_init()
 {
-    virtualStack.reserve(5);
+    virtualStack.clear();
     for (int i = 0; i < 5; i++)
     {
         virtualStack.push_back(map<const void*, TSnapshotNode*>());

@@ -55,6 +55,7 @@ int snapshot_capture(lua_State * L)
     snapshot_traverse_init();
     snapshot_traverse_table(L, NULL, "[registry]");
     snapshot_generate_result(L);
+    snapshot_traverse_init();
     return 0;
 }
 
