@@ -1,0 +1,8 @@
+Snapshot.cs 为快照相关类，包含C库接口，C快照结果获取，数据处理
+
+LuaMonitor.cs为Unity编辑器主窗口
+_View.cs 为Unity编辑器窗口的部分视图
+
+ZoomArea.cs
+Utility.cs
+TreeMapView.cs 中的部分代码来自其他项目
