@@ -11,16 +11,16 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\snapshot.c">
+    <ClCompile Include="src\traverse.cpp">
       <Filter>source</Filter>
     </ClCompile>
-    <ClCompile Include="src\lua51.c">
+    <ClCompile Include="src\snapshot.cpp">
       <Filter>source</Filter>
     </ClCompile>
-    <ClCompile Include="src\traverse.c">
+    <ClCompile Include="src\result.cpp">
       <Filter>source</Filter>
     </ClCompile>
-    <ClCompile Include="src\result.c">
+    <ClCompile Include="src\lua51.cpp">
       <Filter>source</Filter>
     </ClCompile>
   </ItemGroup>

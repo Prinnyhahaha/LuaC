@@ -1,13 +1,43 @@
 //#define SNAPSHOT_BUILD_LIB 1
 #include <snapshot/snapshot.h>
 #include <stdbool.h>
-#include <stdlib.h>
+
+#include <vector>
+#include <map>
+#include <string>
+
+using std::vector;
+using std::map;
+using std::string;
+
+vector<map<const void*, TSnapshotNode*> > virtualStack;
+map<const void*, string> sourceTable;
+map<const void*, bool> markTable;
+SnapshotNode* result;
+int nResult;
+
+/* DEBUG_LOG */
+static FILE* debug_fp = NULL;
+static bool enable_debug = true;
+
+static void debug_log(const char* fmt, ...)
+{
+    if (!enable_debug)
+        return;
+    if (debug_fp == NULL)
+        debug_fp = fopen("snapshot.log", "w");
+    if (debug_fp)
+    {
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(debug_fp, fmt, args);
+        va_end(args);
+        fflush(debug_fp);
+    }
+}
+/* DEBUG_LOG */
 
 static bool inited = false;
-static lua_State* dL = NULL;
-
-extern SnapshotNode* result;
-extern int resultIdx;
 
 void snapshot_initialize(lua_State *L)
 {
@@ -20,16 +50,12 @@ int snapshot_capture(lua_State * L)
     if (!inited)
         return -1;
     snapshot_destroy_result();
-    dL = luaL_newstate();
-    int i;
-    for (i = 0; i < 7; i++) {
-        lua_newtable(dL);
-    }
     lua_pushvalue(L, LUA_REGISTRYINDEX);
     //lua_getglobal(L, "_G");
-    snapshot_traverse_table(L, dL, NULL, "[registry]");
-    snapshot_generate_result(L, dL);
-    lua_close(dL);
+    snapshot_traverse_init();
+    snapshot_traverse_table(L, NULL, "[registry]");
+    snapshot_generate_result(L);
+    snapshot_traverse_init();
     return 0;
 }
 
@@ -41,7 +67,7 @@ void snapshot_clear()
 int snapshot_get_gcobj_num()
 {
     if (result)
-        return resultIdx;
+        return nResult;
     return -1;
 }
 
@@ -58,7 +84,7 @@ int snapshot_get_gcobjs(const int len, SnapshotNode * out)
 int snapshot_get_parent_num(int index)
 {
     if (result)
-        return result[index].parentNum;
+        return result[index].nParent;
     return -1;
 }
 

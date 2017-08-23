@@ -1,7 +1,8 @@
 #ifndef __TREE_H__
 #define __TREE_H__
 
-#include <stdbool.h>
+#include <string>
+#include <map>
 
 typedef enum _SnapshotType
 {
@@ -31,7 +32,16 @@ typedef struct _SnapshotNode
         [local] %s : %s:%d //variable name; chunk name; lines
         %s                 //key of the value
     */
-    unsigned int parentNum;//Numbers of references
+    unsigned int nParent;//Numbers of references
 } SnapshotNode;
+
+typedef struct __SnapshotNode
+{
+    const void * address;//Address of the GCobj
+    SnapshotType type;//Type of the GCobj
+    std::string debuginfo;//Chunk name and line number, if any
+    unsigned int size;//Memory of the GCobj contains, see traverse.c
+    std::map<const void*, std::string> parents;
+} TSnapshotNode;
 
 #endif

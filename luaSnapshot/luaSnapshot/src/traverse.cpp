@@ -4,6 +4,19 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <vector>
+#include <map>
+#include <string>
+
+using std::vector;
+using std::map;
+using std::string;
+
+extern vector<map<const void*, TSnapshotNode*> > virtualStack;
+extern map<const void*, string> sourceTable;
+extern map<const void*, bool> markTable;
+
+/* DEBUG_LOG */
 static FILE* debug_fp = NULL;
 static bool enable_debug = true;
 
@@ -22,21 +35,34 @@ static void debug_log(const char* fmt, ...)
         fflush(debug_fp);
     }
 }
+/* DEBUG_LOG */
 
-static bool is_marked(lua_State *dL, const void *p)
+void snapshot_traverse_init()
 {
-    lua_rawgetp(dL, STACKPOS_MARK, p);
-    if (lua_isnil(dL, -1)) {
-        lua_pop(dL, 1);
-        lua_pushboolean(dL, 1);
-        lua_rawsetp(dL, STACKPOS_MARK, p);
+    virtualStack.clear();
+    for (int i = 0; i < 5; i++)
+    {
+        virtualStack.push_back(map<const void*, TSnapshotNode*>());
+    }
+    for (size_t i = 0; i < virtualStack.size(); i++)
+    {
+        virtualStack[i].clear();
+    }
+    sourceTable.clear();
+    markTable.clear();
+}
+
+static bool is_marked(const void *p)
+{
+    if (markTable.find(p) == markTable.end())
+    {
+        markTable[p] = true;
         return false;
     }
-    lua_pop(dL, 1);
     return true;
 }
 
-static const void* readobject(lua_State *L, lua_State *dL, const void *parent, const char *desc)
+static const void* readobject(lua_State *L, const void *parent, const char *desc)
 {
     int t = lua_type(L, -1);
     int tidx = 0;
@@ -61,22 +87,18 @@ static const void* readobject(lua_State *L, lua_State *dL, const void *parent, c
     }
 
     const void * p = lua_topointer(L, -1);
-    if (is_marked(dL, p)) {
-        lua_rawgetp(dL, tidx, p);
-        if (!lua_isnil(dL, -1)) {
-            lua_pushstring(dL, desc);
-            lua_rawsetp(dL, -2, parent);
+    if (is_marked(p)) {
+        if (virtualStack[tidx - 1].find(p) != virtualStack[tidx - 1].end())
+        {
+            virtualStack[tidx - 1][p]->parents[parent] = desc;
         }
-        lua_pop(dL, 1);
         lua_pop(L, 1);
         return NULL;
     }
 
-    lua_newtable(dL);
-    lua_pushstring(dL, desc);
-    lua_rawsetp(dL, -2, parent);
-    lua_rawsetp(dL, tidx, p);
-
+    TSnapshotNode* pnode = new TSnapshotNode();
+    virtualStack[tidx - 1][p] = pnode;
+    pnode->parents[parent] = desc;
     return p;
 }
 
@@ -102,9 +124,9 @@ static const char* keystring(lua_State *L, int index, char *buffer)
     return buffer;
 }
 
-void snapshot_traverse_table(lua_State *L, lua_State *dL, const void * parent, const char * desc)
+void snapshot_traverse_table(lua_State *L, const void * parent, const char * desc)
 {
-    const void * t = readobject(L, dL, parent, desc);
+    const void * t = readobject(L, parent, desc);
     if (t == NULL)
         return;
     debug_log("traverse table %p, parent %p as %s\n", t, parent, desc);
@@ -114,8 +136,7 @@ void snapshot_traverse_table(lua_State *L, lua_State *dL, const void * parent, c
     assert(tv->it == LJ_TTAB);
     GCtab* tbl = &((GCobj*)(uintptr_t)(tv->gcr.gcptr32))->tab;
     unsigned int size = sizeof(GCtab) + sizeof(TValue) * tbl->asize + sizeof(Node) * (tbl->hmask + 1);
-    lua_pushinteger(dL, size);
-    lua_rawsetp(dL, STACKPOS_MARK, t);
+    virtualStack[STACKPOS_TABLE - 1][t]->size = size;
 
     bool weakk = false;
     bool weakv = false;
@@ -133,7 +154,7 @@ void snapshot_traverse_table(lua_State *L, lua_State *dL, const void * parent, c
         }
         lua_pop(L, 1);
         luaL_checkstack(L, LUA_MINSTACK, NULL);
-        snapshot_traverse_table(L, dL, t, "[metatable]");
+        snapshot_traverse_table(L, t, "[metatable]");
     }
 
     lua_pushnil(L);
@@ -144,20 +165,20 @@ void snapshot_traverse_table(lua_State *L, lua_State *dL, const void * parent, c
         else {
             char temp[50];
             const char * desc = keystring(L, -2, temp);
-            snapshot_traverse_object(L, dL, t, desc);
+            snapshot_traverse_object(L, t, desc);
         }
         if (!weakk) {
             lua_pushvalue(L, -1);
-            snapshot_traverse_object(L, dL, t, "[key]");
+            snapshot_traverse_object(L, t, "[key]");
         }
     }
 
     lua_pop(L, 1);
 }
 
-void snapshot_traverse_function(lua_State *L, lua_State *dL, const void * parent, const char *desc)
+void snapshot_traverse_function(lua_State *L, const void * parent, const char *desc)
 {
-    const void * t = readobject(L, dL, parent, desc);
+    const void * t = readobject(L, parent, desc);
     if (t == NULL)
         return;
     debug_log("traverse function %p, parent %p as %s\n", t, parent, desc);
@@ -170,20 +191,19 @@ void snapshot_traverse_function(lua_State *L, lua_State *dL, const void * parent
     if (func->c.ffid == FF_LUA)
     {
         size = (sizeof(GCfuncL) - sizeof(GCRef) + sizeof(GCRef)*((MSize)func->l.nupvalues));
-        size += ((GCproto*)(uintptr_t)(func->l.pc.ptr32))->sizept;
+        size += ((GCproto*)(uintptr_t)(func->l.pc.ptr32) - 1)->sizept;
     }
     else
     {
         size = (sizeof(GCfuncC) - sizeof(TValue) + sizeof(TValue)*((MSize)func->c.nupvalues));
-        size += ((GCproto*)(uintptr_t)(func->c.pc.ptr32))->sizept;
+        size += ((GCproto*)(uintptr_t)(func->c.pc.ptr32) - 1)->sizept;
     }
-    lua_pushinteger(dL, size);
-    lua_rawsetp(dL, STACKPOS_MARK, t);
+    virtualStack[STACKPOS_FUNCTION - 1][t]->size = size;
 
 #if LUA_VERSION_NUM == 501
     lua_getfenv(L, -1);
     if (lua_istable(L, -1)) {
-        snapshot_traverse_table(L, dL, t, "[environment]");
+        snapshot_traverse_table(L, t, "[environment]");
     }
     else {
         lua_pop(L, 1);
@@ -195,33 +215,30 @@ void snapshot_traverse_function(lua_State *L, lua_State *dL, const void * parent
         const char *name = lua_getupvalue(L, -1, i);
         if (name == NULL)
             break;
-        snapshot_traverse_object(L, dL, t, name[0] ? name : "[upvalue]");
+        snapshot_traverse_object(L, t, name[0] ? name : "[upvalue]");
     }
     if (lua_iscfunction(L, -1)) {
         if (i == 1) {
             // light c function
-            lua_pushnil(dL);
-            lua_rawsetp(dL, STACKPOS_FUNCTION, t);
+            virtualStack[STACKPOS_FUNCTION - 1].erase(t);
         }
         lua_pop(L, 1);
     }
     else {
         lua_Debug ar;
         lua_getinfo(L, ">S", &ar);
-        luaL_Buffer b;
-        luaL_buffinit(dL, &b);
-        luaL_addstring(&b, ar.short_src);
+        string b = "";
+        b = b + ar.short_src;
         char tmp[128];
         sprintf(tmp, ":%d", ar.linedefined);
-        luaL_addstring(&b, tmp);
-        luaL_pushresult(&b);
-        lua_rawsetp(dL, STACKPOS_SOURCE, t);
+        b = b + tmp;
+        sourceTable[t] = b;
     }
 }
 
-void snapshot_traverse_userdata(lua_State *L, lua_State *dL, const void * parent, const char *desc)
+void snapshot_traverse_userdata(lua_State *L, const void * parent, const char *desc)
 {
-    const void * t = readobject(L, dL, parent, desc);
+    const void * t = readobject(L, parent, desc);
     if (t == NULL)
         return;
     debug_log("traverse userdata %p, parent %p as %s\n", t, parent, desc);
@@ -231,11 +248,10 @@ void snapshot_traverse_userdata(lua_State *L, lua_State *dL, const void * parent
     assert(tv->it == LJ_TUDATA);
     GCudata* ud = &((GCobj*)(uintptr_t)(tv->gcr.gcptr32))->ud;
     unsigned int size = sizeof(GCudata) + ud->len;
-    lua_pushinteger(dL, size);
-    lua_rawsetp(dL, STACKPOS_MARK, t);
+    virtualStack[STACKPOS_USERDATA - 1][t]->size = size;
 
     if (lua_getmetatable(L, -1)) {
-        snapshot_traverse_table(L, dL, t, "[metatable]");
+        snapshot_traverse_table(L, t, "[metatable]");
     }
 
     lua_getuservalue(L, -1);
@@ -243,14 +259,14 @@ void snapshot_traverse_userdata(lua_State *L, lua_State *dL, const void * parent
         lua_pop(L, 2);
     }
     else {
-        snapshot_traverse_table(L, dL, t, "[uservalue]");
+        snapshot_traverse_table(L, t, "[uservalue]");
         lua_pop(L, 1);
     }
 }
 
-void snapshot_traverse_thread(lua_State *L, lua_State *dL, const void * parent, const char *desc)
+void snapshot_traverse_thread(lua_State *L, const void * parent, const char *desc)
 {
-    const void * t = readobject(L, dL, parent, desc);
+    const void * t = readobject(L, parent, desc);
     if (t == NULL)
         return;
     debug_log("traverse thread %p, parent %p as %s\n", t, parent, desc);
@@ -260,8 +276,7 @@ void snapshot_traverse_thread(lua_State *L, lua_State *dL, const void * parent, 
     assert(tv->it == LJ_TTHREAD);
     lua_State* th = &((GCobj*)(uintptr_t)(tv->gcr.gcptr32))->th;
     unsigned int size = sizeof(lua_State) + sizeof(TValue) * th->stacksize;
-    lua_pushinteger(dL, size);
-    lua_rawsetp(dL, STACKPOS_MARK, t);
+    virtualStack[STACKPOS_THREAD - 1][t]->size = size;
 
     int level = 0;
     lua_State *cL = lua_tothread(L, -1);
@@ -276,21 +291,19 @@ void snapshot_traverse_thread(lua_State *L, lua_State *dL, const void * parent, 
         for (i = 0; i < top; i++) {
             lua_pushvalue(cL, i + 1);
             sprintf(tmp, "[stack] [%d]", i + 1);
-            snapshot_traverse_object(cL, dL, cL, tmp);
+            snapshot_traverse_object(cL, cL, tmp);
         }
     }
     lua_Debug ar;
-    luaL_Buffer b;
-    luaL_buffinit(dL, &b);
-    luaL_addstring(&b, "");
+    string b = "";
     while (lua_getstack(cL, level, &ar)) {
         char tmp[128];
         lua_getinfo(cL, "Sl", &ar);
-        luaL_addstring(&b, ar.short_src);
+        b = b + ar.short_src;
         if (ar.currentline >= 0) {
             char tmp[128];
             sprintf(tmp, ":%d ", ar.currentline);
-            luaL_addstring(&b, tmp);
+            b = b + tmp;
         }
 
         int i;
@@ -299,49 +312,48 @@ void snapshot_traverse_thread(lua_State *L, lua_State *dL, const void * parent, 
             if (name == NULL)
                 break;
             snprintf(tmp, sizeof(tmp), "[local] %s : %s:%d", name, ar.short_src, ar.currentline);
-            snapshot_traverse_object(cL, dL, t, tmp);
+            snapshot_traverse_object(cL, t, tmp);
         }
 
         ++level;
     }
-    luaL_pushresult(&b);
-    lua_rawsetp(dL, STACKPOS_SOURCE, t);
+    sourceTable[t] = b;
     lua_pop(L, 1);
 }
 
-void snapshot_traverse_object(lua_State *L, lua_State *dL, const void * parent, const char *desc)
+void snapshot_traverse_object(lua_State *L, const void * parent, const char *desc)
 {
     luaL_checkstack(L, LUA_MINSTACK, NULL);
     int t = lua_type(L, -1);
     switch (t) {
     case LUA_TTABLE:
-        snapshot_traverse_table(L, dL, parent, desc);
+        snapshot_traverse_table(L, parent, desc);
         break;
     case LUA_TUSERDATA:
-        snapshot_traverse_userdata(L, dL, parent, desc);
+        snapshot_traverse_userdata(L, parent, desc);
         break;
     case LUA_TFUNCTION:
-        snapshot_traverse_function(L, dL, parent, desc);
+        snapshot_traverse_function(L, parent, desc);
         break;
     case LUA_TTHREAD:
-        snapshot_traverse_thread(L, dL, parent, desc);
+        snapshot_traverse_thread(L, parent, desc);
         break;
     case LUA_TSTRING:
-        snapshot_traverse_string(L, dL, parent, desc);
+        snapshot_traverse_string(L, parent, desc);
         break;
     default:
-        debug_log("traverse nogc\n");
+        debug_log("traverse non-GCobj\n");
         lua_pop(L, 1);
         break;
     }
 }
 
-void snapshot_traverse_string(lua_State * L, lua_State * dL, const void * parent, const char * desc)
+void snapshot_traverse_string(lua_State * L, const void * parent, const char * desc)
 {
     const char *str = lua_tostring(L, -1);
     char *tmp = (char*)malloc(strlen(str) + 4 + strlen(desc));
     sprintf(tmp, "%s \"%s\"", desc, str);
-    const void * t = readobject(L, dL, parent, tmp);
+    const void * t = readobject(L, parent, tmp);
     if (t == NULL)
         return;
     debug_log("traverse string %p, parent %p as %s\n", t, parent, tmp);
@@ -351,8 +363,7 @@ void snapshot_traverse_string(lua_State * L, lua_State * dL, const void * parent
     assert(tv->it == LJ_TSTR);
     GCstr* gcstr = &((GCobj*)(uintptr_t)(tv->gcr.gcptr32))->str;
     unsigned int size = sizeof(GCstr) + gcstr->len;
-    lua_pushinteger(dL, size);
-    lua_rawsetp(dL, STACKPOS_MARK, t);
+    virtualStack[STACKPOS_STRING - 1][t]->size = size;
 
     free(tmp);
     lua_pop(L, 1);
